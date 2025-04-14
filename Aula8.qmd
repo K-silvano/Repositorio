@@ -1,0 +1,80 @@
+---
+title: "Evolução das Reservas Totais dos Países"
+format: html
+editor: visual
+---
+
+```{r}
+#| label: load-packages
+#| include: false
+
+library(tidyverse)
+library(WDI)
+library(scales)
+library(gganimate)
+library(gifski)
+library(quarto)
+
+# Ajustar para evitar notação científica
+options(scipen = 999)
+
+# Obter dados de reservas totais (inclui ouro) para todos os países
+reserveall <- WDI(country = 'all', 
+                  indicator = 'FI.RES.TOTL.CD')
+
+# Filtrar top 10 países com maiores reservas em 2023
+top10_paises_2023 <- reserveall %>%
+  filter(year == 2023, !is.na(FI.RES.TOTL.CD)) %>%
+  arrange(desc(FI.RES.TOTL.CD)) %>%
+  slice_head(n = 10) %>%
+  pull(country)
+
+# Filtrar o dataset original apenas com esses países
+reserveall_top10 <- reserveall %>%
+  filter(country %in% top10_paises_2023)
+
+
+```
+
+## **Introdução**
+
+As reservas totais de um país, que incluem ativos como o ouro, são um indicador importante da saúde econômica e da capacidade de um país de sustentar sua moeda e pagar suas dívidas. Neste gráfico, mostramos a evolução das reservas totais de dez países com as maiores reservas em 2023, utilizando dados do Banco Mundial.
+
+## **Objetivo**
+
+O objetivo deste gráfico animado é ilustrar como as reservas totais de vários países mudaram ao longo do tempo. A animação permite observar de maneira dinâmica as flutuações nas reservas, o que pode refletir a política econômica, a situação do mercado financeiro e as estratégias de acumulação de reservas.
+
+## **Dados Utilizados**
+
+Os dados utilizados neste gráfico foram obtidos a partir do **Banco Mundial** (indicador `FI.RES.TOTL.CD`), que fornece informações sobre as reservas totais de cada país. Este conjunto de dados foi filtrado para incluir apenas os **10 países com as maiores reservas totais** no ano de 2023. A análise foi realizada com base nos valores anuais dessas reservas, apresentados em dólares americanos correntes.
+
+## **Metodologia**
+
+1.  **Fontes de Dados**: Os dados foram extraídos utilizando a API do Banco Mundial, especificamente o indicador `FI.RES.TOTL.CD`, que representa as reservas totais, incluindo ouro.
+2.  **Seleção dos Países**: Filtramos os 10 países com as maiores reservas totais em 2023.
+3.  **Criação do Gráfico**: Utilizando o `ggplot2` e o pacote `gganimate`, criamos uma animação que mostra a evolução dessas reservas ao longo dos anos.
+
+## **Gráfico Animado**
+
+Aqui está a animação que mostra a evolução das reservas totais (em dólares correntes) para os 10 países com as maiores reservas em 2023.
+
+```{r}
+#| label: plot-graph
+#| echo: false
+#| warning: false
+
+# Gráfico animado: evolução das reservas ao longo do tempo
+ggplot(reserveall_top10, aes(x = year, y = FI.RES.TOTL.CD, color = country, group = country)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 2) +
+  labs(title = "Evolução das Reservas Totais (Inclui Ouro, US$ Correntes)",
+       subtitle = "Ano: {frame_along}",
+       x = "Ano",
+       y = "Reservas Totais (US$)",
+       color = "País") +
+  theme_minimal() +
+  scale_y_continuous(labels = label_dollar()) +
+  transition_reveal(year)
+
+#
+```
