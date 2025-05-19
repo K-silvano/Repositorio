@@ -1,0 +1,187 @@
+---
+title: "**Kauê Silvano**"
+format: html
+editor: visual
+---
+
+```{r}
+#| label: load-packages
+#| include: false
+
+library(tidyverse)
+library(WDI)
+library(scales)
+library(gganimate)
+library(gifski)
+library(quarto)
+```
+
+```{r}
+#| label: load-data
+#| include: false
+# Exemplo de carregamento de dados do WDI
+reserveall <- WDI(
+  indicator = "FI.RES.TOTL.CD",
+  start = 2000,
+  end = 2024,
+  extra = TRUE
+) %>%
+  filter(!is.na(FI.RES.TOTL.CD))
+
+# Seleciona os top10 países por reserva cumulativa
+reserveall_top10 <- reserveall %>%
+  group_by(country) %>%
+  summarise(total = sum(FI.RES.TOTL.CD, na.rm = TRUE)) %>%
+  arrange(desc(total)) %>%
+  slice_head(n = 10) %>%
+  pull(country) %>%
+  { filter(reserveall, country %in% .) }
+
+cross_2023 <- reserveall %>%
+  filter(year == 2023) %>%
+  group_by(country) %>%
+  summarise(valor = sum(FI.RES.TOTL.CD, na.rm = TRUE)) %>%
+  arrange(desc(valor)) %>%
+  slice_head(n = 10)
+```
+
+## **Introdução**
+
+As reservas totais de um país incluem ativos importantes como ouro, moedas estrangeiras e títulos de dívida externa, sendo essenciais para garantir a saúde econômica e financeira de uma nação. Neste estudo, apresentamos gráficos que demonstram a evolução histórica e a comparação recente das reservas totais dos dez países com maiores reservas no ano mais recente disponível, utilizando dados fornecidos pelo Banco Mundial.
+
+## **Objetivo**
+
+O objetivo principal desses gráficos é ilustrar como as reservas totais de diferentes países evoluíram ao longo do tempo, identificar flutuações significativas e realizar uma comparação direta entre os países no último ano disponível. Essas análises permitem observar o impacto das políticas econômicas, condições de mercado financeiro e estratégias de acumulação de reservas adotadas pelos países.
+
+## **Dados Utilizados**
+
+Os dados utilizados nesta análise foram obtidos diretamente do Banco Mundial, especificamente o indicador FI.RES.TOTL.CD, que representa as reservas totais incluindo ouro, expressas em dólares americanos correntes. O conjunto de dados inclui os 10 países com as maiores reservas totais registradas no último ano disponível, abrangendo valores anuais para permitir análises comparativas e históricas detalhadas.
+
+## **Metodologia**
+
+-   **Fonte dos Dados:** Dados extraídos do Banco Mundial utilizando a API através do pacote WDI, com o indicador FI.RES.TOTL.CD.
+
+-   **Construção dos Gráficos:** Os gráficos foram criados utilizando as ferramentas ggplot2 e gganimate no R. A série temporal animada mostra dinamicamente a evolução anual das reservas, enquanto o gráfico transversal compara diretamente as reservas totais dos países no ano mais recente disponível. O gráfico em painel oferece uma visão detalhada e individual das reservas ao longo do tempo para cada país.
+
+## Evolução das Reservas Totais
+
+Visualização dinâmica da evolução das reservas totais, incluindo ouro, dos principais países acumuladores entre os anos 2000 e 2024, destacando as principais tendências, períodos de rápido crescimento e eventuais quedas acentuadas ao longo deste período.
+
+```{r}
+#| label: animated-panel
+#| echo: false
+#| warning: false
+# Gráfico animado de dados em painel (linha animada ao longo dos anos)
+
+ggplot(reserveall_top10, aes(x = year, y = FI.RES.TOTL.CD, color = country, group = country)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 2) +
+  labs(title = "Evolução das Reservas Totais",
+       subtitle = "Ano: {frame_along}",
+       x = "Ano",
+       y = "Reservas Totais (US$)",
+       color = "País") +
+  theme_minimal() +
+    theme(
+    plot.title = element_text(size = 18, face = "bold"),
+    axis.title = element_text(size = 16),
+    axis.text = element_text(size = 13)
+  ) +
+  scale_y_continuous(labels = label_dollar()) +
+  transition_reveal(year)
+```
+
+## Reservas Totais por País em 2023 e 2024
+
+Comparação direta das reservas totais dos dez países com maiores estoques em 2023 e 2024, destacando mudanças significativas de um ano para outro, e permitindo análise dos impactos econômicos recentes em cada país
+
+```{r}
+#| label: cross-section
+#| echo: false
+#| context: server
+#| layout-ncol: 2
+
+# Gráfico Cross Section: Reservas Totais por país no ano mais recente
+latest_year <- max(reserveall_top10$year, na.rm = TRUE)
+cross_section_data <- reserveall_top10 %>%
+  filter(year == latest_year)
+
+g1 <- ggplot(cross_section_data, aes(x = reorder(country, FI.RES.TOTL.CD), y = FI.RES.TOTL.CD, fill = country)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(title = paste("Reservas Totais por País em", latest_year),
+       x = "País",
+       y = "Reservas Totais (US$)") +
+  theme_minimal() +
+   theme_minimal(base_size = 14) +  # <- Aumenta fonte geral
+  theme(
+    plot.title = element_text(size = 18, face = "bold"),
+    axis.title = element_text(size = 16),
+     axis.text.x = element_text(size = 9, angle = 45, hjust = 1),  # eixo X: números girados
+    
+  ) +
+  scale_y_continuous(labels = label_dollar()) 
+
+g2 <- ggplot(cross_2023, aes(x = reorder(country, valor), y = valor, fill = country)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(title = "Reservas Totais por País em 2023",
+       x = "País",
+       y = "Reservas Totais (US$)") +
+  theme_minimal() +
+  theme_minimal(base_size = 14) +  # <- Aumenta fonte geral
+  theme(
+    plot.title = element_text(size = 18, face = "bold"),
+    axis.title = element_text(size = 16),
+    axis.text.x = element_text(size = 9, angle = 45, hjust = 1),  # eixo X: números girados
+  ) +
+  scale_y_continuous(labels = label_dollar())
+
+g2
+g1
+```
+
+```         
+```
+
+## Séries Temporais de Reservas Totais
+
+Análise detalhada das reservas totais ao longo do tempo especificamente do Estados Unidos, observada nessa grande economia ao longo dos anos.
+
+```{r}
+#| label: time-series
+#| echo: false
+#| warning: false
+
+# Série Temporal (Time Series)
+# Definição: Dados coletados ao longo do tempo para uma única unidade de análise (por exemplo, um país, uma empresa ou um indivíduo).
+# Exemplo: PIB do Brasil de 2000 a 2024.
+# Objetivo: Analisar padrões ao longo do tempo, como tendências, sazonalidades, ciclos, etc.
+# Uso comum: Previsão, política monetária, análise de mercado financeiro.
+selected_countries <- c("United States")  # ajuste conforme necessário
+
+time_series_data <- reserveall_top10 %>%
+  filter(country %in% selected_countries)
+
+filtered_data <- time_series_data %>%
+  filter(year >= 2000 & year <= 2024)
+
+# Criar o gráfico
+ggplot(filtered_data, aes(x = year, y = FI.RES.TOTL.CD, color = country)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  labs(
+    title = "Séries Temporais de Reservas Totais",
+    subtitle = "Ano: 2000 - 2024",
+    x = "Ano",
+    y = "Reservas Totais (US$)",
+    color = "País"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 18, face = "bold"),
+    axis.title = element_text(size = 16),
+    axis.text = element_text(size = 13)
+  ) +
+  scale_y_continuous(labels = label_dollar())
+```
