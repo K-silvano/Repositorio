@@ -1,0 +1,207 @@
+---
+title: "**Kauê Silvano**"
+format: html
+editor: visual
+---
+
+# **Evolução do Salário Mínimo no Brasil**
+
+### **Esta animação apresenta a trajetória do salário mínimo no Brasil entre 1995 e 2025, utilizando dados oficiais do Banco Central (Série ID 1619).**
+
+A linha escura representa o valor do salário mínimo ao longo dos anos, enquanto o ponto laranja destacam os reajustes oficiais.
+
+Em junho de 1995, o salário mínimo era de **R\$ 70,00**, conforme a Lei nº 9.063, de 14 de junho de 1995. Já em 2025, o valor atinge **R\$ 1.518,00**, evidenciando um significativo aumento em 30 anos.
+
+Durante esse período, observamos um crescimento constante, com reajustes anuais realizados para acompanhar a inflação e preservar o poder de compra dos trabalhadores. A partir dos anos 2000, o salário mínimo também passou a receber aumentos reais, ou seja, reajustes acima da inflação.
+
+A inflação é o aumento generalizado dos preços ao longo do tempo, o que reduz o poder aquisitivo da população. Por isso, é essencial que o salário mínimo seja ajustado regularmente. Caso contrário, mesmo com aumentos nominais, seu poder real de compra diminui.
+
+Essa animação ajuda a visualizar claramente como reajustes aparentemente pequenos, acumulados ao longo dos anos, resultam em impactos significativos no poder aquisitivo do trabalhador.
+
+```{r}
+#| label: load-packages
+#| include: false
+
+#| label: load-packages
+#| include: false
+
+# 1. Instalar e carregar ragg para gerar PNGs em ambiente headless
+if (!requireNamespace("ragg", quietly = TRUE)) {
+  install.packages("ragg")
+}
+library(ragg)
+
+# 2. Instalar e carregar GetBCBData para baixar séries do Banco Central
+if (!requireNamespace("GetBCBData", quietly = TRUE)) {
+  install.packages("GetBCBData")
+}
+library(GetBCBData)
+
+# 3. Instalar e carregar tidyverse para manipulação de dados
+if (!requireNamespace("tidyverse", quietly = TRUE)) {
+  install.packages("tidyverse")
+}
+library(tidyverse)
+
+# 4. Instalar e carregar scales para formatação de eixos
+if (!requireNamespace("scales", quietly = TRUE)) {
+  install.packages("scales")
+}
+library(scales)
+
+# 5. Instalar e carregar gganimate para animar o gráfico
+if (!requireNamespace("gganimate", quietly = TRUE)) {
+  install.packages("gganimate")
+}
+library(gganimate)
+
+# 6. Instalar e carregar gifski para montar o GIF final
+if (!requireNamespace("gifski", quietly = TRUE)) {
+  install.packages("gifski")
+}
+library(gifski)
+
+# 7. Garantir que, se algo tentar chamar png(), use Cairo interno
+options(bitmapType = "cairo")
+```
+
+```{r}
+#| label: load-data
+#| include: false
+
+# 1. Definição da série (Salário Mínimo: ID = 1619)
+my.id <- c(salario_minimo = 1619)
+
+# 2. Obtenção dos dados do Banco Central (GetBCBData)
+df.bcb <- gbcbd_get_series(
+  id          = my.id,
+  first.date  = "1995-01-01",
+  last.date   = Sys.Date(),
+  format.data = "long",
+  use.memoise = TRUE,
+  cache.path  = tempdir(),
+  do.parallel = FALSE
+)
+
+# 3. Organiza em ordem cronológica e cria coluna 'cumdate' para a animação
+df.bcb <- df.bcb %>%
+  arrange(ref.date) %>%
+  mutate(cumdate = ref.date)
+
+# 4. Extrai valores inicial e final para anotações
+pontos_reais   <- df.bcb %>% filter(!is.na(value))
+primeiro_ponto <- slice_head(pontos_reais, n = 1)
+ultimo_ponto   <- slice_tail(pontos_reais, n = 1)
+
+valor_inicial <- primeiro_ponto$value
+data_inicial  <- primeiro_ponto$ref.date
+
+valor_final <- ultimo_ponto$value
+data_final  <- ultimo_ponto$ref.date
+
+# 5. Calcula posições verticais para os rótulos
+y_inicial <- ifelse(valor_inicial < 80, 130, valor_inicial + 50) + 5
+
+tentativa_final   <- valor_final + 20
+y_temp            <- ifelse(tentativa_final > 1500, valor_final - 20, tentativa_final)
+y_final_ajustado  <- y_temp - 50
+
+# 6. Data frames com as anotações
+df_inicial_annot <- tibble(
+  ref.date = data_inicial,
+  cumdate  = data_inicial,
+  y        = y_inicial,
+  label    = paste0(
+    "Início: R$ ",
+    format(valor_inicial, big.mark = ".", decimal.mark = ",")
+  )
+)
+
+df_final_annot <- tibble(
+  ref.date = data_final,
+  cumdate  = data_final,
+  y        = y_final_ajustado,
+  label    = paste0(
+    "Em 2025: R$ ",
+    format(valor_final, big.mark = ".", decimal.mark = ",")
+  )
+)
+```
+
+```{r}
+#| label: animated-graphic
+#| echo: false
+#| warning: false
+
+# 1. Construção do gráfico animado (sem modificações)
+p_anim <- ggplot(df.bcb, aes(x = ref.date, y = value)) +
+  geom_line(color = "#2c3e50", size = 1.0) +
+  geom_point(color = "#e67e22", size = 2.5) +
+  geom_text(
+    data        = df_inicial_annot,
+    aes(x = ref.date, y = y, label = label, cumdate = cumdate),
+    hjust       = 0, vjust = 0,
+    nudge_x     = 100,
+    nudge_y     = 30,
+    color       = "#34495e", size = 3.5, fontface = "bold",
+    inherit.aes = FALSE
+  ) +
+  geom_text(
+    data        = df_final_annot,
+    aes(x = ref.date, y = y, label = label, cumdate = cumdate),
+    hjust       = 1, vjust = 0,
+    nudge_x     = -100,
+    nudge_y     = -20,
+    color       = "#34495e", size = 3.5, fontface = "bold",
+    inherit.aes = FALSE
+  ) +
+  scale_y_continuous(
+    limits = c(0, 1500),
+    breaks = seq(0, 1500, by = 100),
+    labels = label_dollar(prefix = "R$ ", big.mark = ".", decimal.mark = ","),
+    expand = c(0, 0)
+  ) +
+  scale_x_date(
+    limits      = c(as.Date("1995-01-01"), max(df.bcb$ref.date)),
+    date_breaks = "2 years", date_labels = "%Y",
+    expand      = c(0, 0)
+  ) +
+  labs(
+    title    = "Evolução do Salário Mínimo (R$) no Brasil",
+    subtitle = paste0(
+      "Período: ",
+      format(min(df.bcb$ref.date), "%d/%m/%Y"),
+      " a ",
+      format(max(df.bcb$ref.date), "%d/%m/%Y")
+    ),
+    x       = "Ano", y = "Valor (R$)",
+    caption = "Fonte: Banco Central do Brasil – Série ID 1619"
+  ) +
+  theme_light(base_size = 14) +
+  theme(
+    plot.title       = element_text(face = "bold", size = 20, color = "#34495e"),
+    plot.subtitle    = element_text(face = "italic", size = 12, color = "#7f8c8d"),
+    plot.caption     = element_text(size = 10, face = "italic"),
+    axis.title.x     = element_text(size = 18, face = "bold", color = "#2c3e50"),
+    axis.title.y     = element_text(size = 18, face = "bold", color = "#2c3e50"),
+    axis.text.x      = element_text(angle = 45, hjust = 1, color = "#2c3e50"),
+    axis.text.y      = element_text(color = "#2c3e50"),
+    panel.grid.major = element_line(color = "#ecf0f1"),
+    panel.grid.minor = element_blank()
+  ) +
+  transition_reveal(cumdate, keep_last = TRUE) +
+  ease_aes("linear")
+
+# 2. Renderiza a animação em 1600×1000 px para ficar mais nítida
+ani <- animate(
+  p_anim,
+  nframes   = 200,
+  fps       = 15,
+  end_pause = 20,
+  device    = "ragg_png", 
+  renderer  = gifski_renderer(loop = TRUE)
+)
+
+# 3. Exibe a animação no resultado HTML
+ani
+```
